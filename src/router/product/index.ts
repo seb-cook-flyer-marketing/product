@@ -1,4 +1,5 @@
 import { DaprServer, HttpMethod, DaprClient } from "@dapr/dapr";
+import { KeyValuePairType } from "@dapr/dapr/types/KeyValuePair.type";
 
 const daprHost = process.env.DAPR_HOST || 'http://localhost';
 const daprPort = process.env.DAPR_HTTP_PORT || '3500';
@@ -19,6 +20,7 @@ export function productRoutes(server: DaprServer) {
         return response
     }, { method: HttpMethod.GET });
 
+    //POST REQUEST
     server.invoker.listen("product", async (request: any) => {
         console.log("Received request", request);
         await client.pubsub.publish("az.sb", "product", request.body, { contentType: "application/json" }).then((response) => {
@@ -29,6 +31,7 @@ export function productRoutes(server: DaprServer) {
             return { status: 500, data: "product Creation Failed" };
         });
     }, { method: HttpMethod.POST });
+    //END POST REQUEST
 
     server.invoker.listen("product", async (request) => {
         console.log("Received request", request);
@@ -39,4 +42,24 @@ export function productRoutes(server: DaprServer) {
         console.log("Received request", request);
         return { status: 200, data: "product Deleted" };
     }, { method: HttpMethod.DELETE });
-}
+
+    const saveState = async (state: KeyValuePairType[]) => {
+        await client.state.save("cosmosdb", state).then((response) => {
+            console.log("Response from save state", response);
+        }).catch((error) => {
+            console.error("Error saving state", error);
+        }
+        );
+    }
+    server.pubsub.subscribe("az.sb", "price", async (message) => {
+        await saveState({
+            ...message.data,
+        }).then((response) => {
+            console.log("Response from save state", response);
+        })
+            .catch((error) => {
+                console.error("Error saving state", error);
+            });
+
+    })
+}; 
